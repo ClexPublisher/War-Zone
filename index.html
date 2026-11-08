@@ -389,7 +389,7 @@ input,textarea,.codein,#gCode{-webkit-user-select:text;user-select:text;-webkit-
 <div id="hud">
   <div class="left">
     <button class="pill" id="toMenu" type="button" aria-label="Volver al menú">☰ Menú</button>
-    <div class="pill" id="hp"><b>Vida</b><span id="hpN">10</span><i><u id="hpFill"></u></i></div>
+    <div class="pill" id="hp"><b>Vida</b><span id="hpN">18</span><i><u id="hpFill"></u></i></div>
     <div class="pill" id="fps" hidden>-- FPS</div>
   </div>
   <div class="right">
@@ -516,7 +516,7 @@ input,textarea,.codein,#gCode{-webkit-user-select:text;user-select:text;-webkit-
 </div>
 <div id="classes" hidden>
   <div class="cpanel" role="dialog" aria-label="Elige tu clase">
-    <h2>Elige tu clase</h2><p>Todas tienen 10 de vida. Cada clase cambia tu velocidad, tu cargador y tu forma de disparar.</p>
+    <h2>Elige tu clase</h2><p>Todas tienen 18 de vida. Cada clase cambia tu velocidad, tu cargador y tu forma de disparar.</p>
     <div class="clist" id="clist"></div>
     <div class="cact"><button id="cBack" type="button">Volver</button><button id="cGo" type="button">Desplegar</button></div>
   </div>
@@ -1502,7 +1502,7 @@ function enemyAt(p){
     if(ex*ex+ez*ez+hy*hy<0.0196)return {e,head:true,dy};
     if(dy>0&&dy<1.5&&Math.hypot(ex,ez)<(dy>0.95?0.21:0.19))return {e,head:false,dy};}
   return null;}
-let playerHP=10,maxHP=10,playerDead=false,hurtA=0,playerMoving=false,GFX=null,spawnX=0,spawnZ=0;
+let playerHP=18,maxHP=18,playerDead=false,hurtA=0,playerMoving=false,GFX=null,spawnX=0,spawnZ=0;
 const hpN=document.getElementById('hpN'),hpFill=document.getElementById('hpFill'),hpEl=document.getElementById('hp'),hurtEl=document.getElementById('hurt'),deadEl=document.getElementById('dead');
 function updHP(){hpN.textContent=String(Math.max(0,playerHP));hpFill.style.width=(Math.max(0,playerHP)/maxHP*100)+'%';hpEl.classList.toggle('low',playerHP<=3);}
 function alertEnemy(e){if(e.dead)return;if(!e.aware)e.fireCD=0.5+Math.random()*0.6;e.aware=true;e.detect=1;e.lostT=0;e.lkx=px;e.lkz=pz;e.losT=0;}
@@ -1689,8 +1689,8 @@ function remoteAt(p){
   return null;}
 function hitRemote(h,fwd,burst,quiet){
   const R=h.rp;burst(h.p,fwd.clone().negate(),0x5a0a0a,h.head?14:9,1.6,9,0.6);
-  const fall=CLS.falloff?CLS.falloff(h.dist):1,base=CLS.dmg||2,hk=CLS.headKill===undefined?20:CLS.headKill;
-  let d;if(h.head)d=(fall>=0.999||h.dist<hk)?99:base*3*fall;else if(CLS.chestKill&&h.dy>=0.95)d=99;else d=base*fall;
+  const fall=CLS.falloff?CLS.falloff(h.dist):1,base=CLS.pellets?2.6:(CLS.dmg||2),hk=CLS.headKill===undefined?20:CLS.headKill;
+  let d;if(h.head)d=CLS.weapon==='sniper'?20:8*fall;else if(CLS.chestKill&&h.dy>=0.95)d=99;else d=base*fall;
   myHits.push({to:R.peer,d:Math.round(d*100)/100,k:++hitSeq,hd:h.head?1:0});if(myHits.length>8)myHits.shift();
   if(MPCH)MPCH.presence({hits:myHits}).catch(()=>{});
   crossEl.classList.remove('hit','head');void crossEl.offsetWidth;crossEl.classList.add(h.head||d>=99?'head':'hit');
@@ -1771,11 +1771,11 @@ function startCoop(ch){COOP=true;MPCH=ch;selfPeerIn(ch);playersEl.hidden=false;f
 let quietUntil=0;
 let MAG=15;const RELOAD=1.45;
 const CLASSES=[
-  {id:'asalto',name:'Asalto',desc:'Fusil M16: dispara ráfagas de 3 balas por cada toque. Preciso y efectivo a media distancia.',weapon:'m16',wpn:'Fusil M16',burst:3,burstCD:240,hp:10,mag:30,rate:70,reload:2.1,speed:1,spr:0.003,sprA:0,zoom:44,vis:1,stealth:1,spdTxt:'Normal'},
-  {id:'opes',name:'Operaciones especiales',desc:'MP5: dispara muy rápido y con poco retroceso. Corres más rápido, ideal de cerca. A lo lejos pierde mucho daño.',weapon:'mp5',wpn:'Subfusil MP5',falloff:d=>d<=12?1:(d>=40?0.3:1-0.7*(d-12)/28),hp:10,mag:30,rate:70,reload:1.6,speed:1.5,spr:0.011,sprA:0.003,zoom:54,vis:0.75,stealth:0.6,spdTxt:'Alta'},
-  {id:'ametra',name:'Ametrallador',desc:'Minigun M134: seis cañones que giran. Tarda un instante en girar antes de disparar y después lanza una lluvia de balas. Cargador gigante de 100 balas; apuntar tarda más y recargar demora bastante.',weapon:'minigun',wpn:'Minigun M134',fovSpd:1.8,hp:10,mag:100,rate:55,reload:4.6,speed:0.68,spr:0.016,sprA:0.0045,zoom:52,vis:1,stealth:1,spdTxt:'Baja'},
-  {id:'demo',name:'Demolición',desc:'Escopeta de bomba: hay que bombear después de cada tiro, pero mata de un disparo de cerca. A media distancia casi no hace nada. Sirve contra grupos.',weapon:'shotgun',wpn:'Escopeta de bomba',pump:true,pellets:9,dmg:1.25,headKill:5,falloff:d=>d<=5?1:(d>=16?0.05:Math.max(0.05,1-(d-5)/9)),hp:10,mag:6,rate:700,reload:2,reloadPer:0.42,speed:0.68,spr:0.085,sprA:0.065,zoom:60,vis:1,stealth:1,spdTxt:'Baja'},
-  {id:'franco',name:'Francotirador',desc:'M40A3: rifle de cerrojo, un tiro a la vez, pero mata de un disparo en el pecho o la cabeza. Con la mira el arma se mueve: aguanta la respiración unos segundos para estabilizarla.',weapon:'sniper',wpn:'Rifle de cerrojo M40A3',bolt:true,chestKill:true,dmg:4,range:600,fovSpd:7,hp:10,mag:5,rate:1250,reload:3.2,speed:1,spr:0.05,sprA:0,zoom:11,vis:1,stealth:1,spdTxt:'Normal'}];
+  {id:'asalto',name:'Asalto',desc:'Fusil M16: dispara ráfagas de 3 balas por cada toque. Preciso y efectivo a media distancia.',weapon:'m16',wpn:'Fusil M16',burst:3,burstCD:240,hp:18,mag:30,rate:70,reload:2.1,speed:1,spr:0.003,sprA:0,zoom:44,vis:1,stealth:1,spdTxt:'Normal'},
+  {id:'opes',name:'Operaciones especiales',desc:'MP5: dispara muy rápido y con poco retroceso. Corres más rápido, ideal de cerca. A lo lejos pierde mucho daño.',weapon:'mp5',wpn:'Subfusil MP5',falloff:d=>d<=12?1:(d>=40?0.3:1-0.7*(d-12)/28),hp:18,mag:30,rate:70,reload:1.6,speed:1.5,spr:0.011,sprA:0.003,zoom:54,vis:0.75,stealth:0.6,spdTxt:'Alta'},
+  {id:'ametra',name:'Ametrallador',desc:'Minigun M134: seis cañones que giran. Tarda un instante en girar antes de disparar y después lanza una lluvia de balas. Cargador gigante de 100 balas; apuntar tarda más y recargar demora bastante.',weapon:'minigun',wpn:'Minigun M134',fovSpd:1.8,hp:18,mag:100,rate:55,reload:4.6,speed:0.68,spr:0.016,sprA:0.0045,zoom:52,vis:1,stealth:1,spdTxt:'Baja'},
+  {id:'demo',name:'Demolición',desc:'Escopeta de bomba: hay que bombear después de cada tiro, pero mata de un disparo de cerca. A media distancia casi no hace nada. Sirve contra grupos.',weapon:'shotgun',wpn:'Escopeta de bomba',pump:true,pellets:9,dmg:1.25,headKill:5,falloff:d=>d<=5?1:(d>=16?0.05:Math.max(0.05,1-(d-5)/9)),hp:18,mag:6,rate:700,reload:2,reloadPer:0.42,speed:0.68,spr:0.085,sprA:0.065,zoom:60,vis:1,stealth:1,spdTxt:'Baja'},
+  {id:'franco',name:'Francotirador',desc:'M40A3: rifle de cerrojo, un tiro a la vez, pero mata de un disparo en el pecho o la cabeza. Con la mira el arma se mueve: aguanta la respiración unos segundos para estabilizarla.',weapon:'sniper',wpn:'Rifle de cerrojo M40A3',bolt:true,chestKill:true,dmg:4,range:600,fovSpd:7,hp:18,mag:5,rate:1250,reload:3.2,speed:1,spr:0.05,sprA:0,zoom:11,vis:1,stealth:1,spdTxt:'Normal'}];
 let CLS=CLASSES[0];
 let ammo=MAG,reloading=false,reloadT=0,reloadTot=1,lastShot=-1e9,firing=false,camKick=0,autoReloadAt=0;
 const fireBtn=document.getElementById('fire'),ammoN=document.getElementById('ammoN'),ammoT=document.getElementById('ammoT'),crossEl=document.getElementById('cross');
