@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>War Zone</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&display=swap">
@@ -332,6 +332,11 @@ html:not(.playing) #hud,html:not(.playing) #joy,html:not(.playing) .btn,html:not
 .mpt[aria-pressed="true"] b,.mpt[aria-pressed="true"] span{color:#1a2a10;opacity:1;}
 .mpt:focus-visible,.mode:focus-visible,#modesClose:focus-visible,#groupsClose:focus-visible{outline:2px solid #f0c95c;outline-offset:2px;}
 [hidden]{display:none!important;}
+/* sin zoom con doble toque ni selección de texto */
+*{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+/* las zonas que se deslizan siguen funcionando aunque toques una tarjeta */
+.shopbody *,.setbody *,.clist *,.wbar *{touch-action:inherit;}
+input,textarea,.codein,#gCode{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:manipulation;}
 .sheet,.cpanel{box-sizing:border-box;}
 .cpanel{overflow:hidden;}
 .cpanel .clist{overflow-y:auto;min-height:0;flex:1 1 auto;touch-action:pan-y;}
@@ -515,6 +520,16 @@ html:not(.playing) #hud,html:not(.playing) #joy,html:not(.playing) .btn,html:not
 <div id="warp" aria-hidden="true"><div><span id="warpT">Infinito</span><small id="warpC"></small></div></div>
 <div id="load"><div>Haciendo crecer la selva…<span>un momento</span></div></div>
 
+<script>
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+  let ultimoToque = 0;
+  document.addEventListener('touchend', e => {
+    const ahora = Date.now();
+    if (ahora - ultimoToque < 300 && !(e.target && e.target.closest && e.target.closest('input, textarea'))) e.preventDefault();
+    ultimoToque = ahora;
+  }, { passive: false });
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
@@ -1692,15 +1707,24 @@ function setupArena(){
   for(let k=0;k<4;k++){const m=new THREE.Mesh(new THREE.PlaneGeometry(half*2,hgt),mat);const a=k*Math.PI/2;
     m.position.set(ARENA.cx+Math.sin(a)*half,base+hgt/2,ARENA.cz+Math.cos(a)*half);m.rotation.y=a;grp.add(m);}
   scene.add(grp);ARENA.mesh=grp;}
+let myCorner=0,mpYaw=null;
 function mpSpawn(){
   if(!ARENA)setupArena();
-  const side=myTeam==='B'?1:(myTeam==='A'?-1:(Math.random()<0.5?-1:1));
-  for(let k=0;k<80;k++){const spread=k<40?ARENA.half*0.35:ARENA.half*0.8;
-    const x=ARENA.cx+(Math.random()*2-1)*spread,z=ARENA.cz+side*ARENA.half*(0.68+Math.random()*0.22);
-    if(outArena(x,z)||H(x,z)<WATER+0.15||!clearOf(x,z,1))continue;
-    let ok=true;for(const R of remotes.values())if(!R.t.dead&&(!myTeam||R.t.team!==myTeam)&&Math.hypot(R.x-x,R.z-z)<15){ok=false;break;}
-    if(ok)return {x,z};}
-  return {x:ARENA.cx,z:ARENA.cz+side*ARENA.half*0.7};}
+  const others=MPCH?MPCH.peers().filter(p=>!p.sameTab&&p.presence&&(p.presence.mp||p.presence.wait||p.presence.grp)):[];
+  let corner,slot=0;
+  if(myTeam){corner=myTeam==='A'?-1:1;
+    let tm=null;if(GRP){tm=GRP.host?GRP.teams:((GRP.room.peers().find(p=>!p.sameTab&&p.presence&&p.presence.host)||{presence:{}}).presence.teams);}
+    const mates=others.filter(p=>(tm&&tm[p.peer]?tm[p.peer]:p.presence.team)===myTeam).map(p=>p.peer);const ids=[myPeer,...mates].sort();slot=ids.indexOf(myPeer);}
+  else{const taken=others.map(p=>+p.presence.cor).find(c=>c===1||c===-1);
+    if(taken)corner=-taken;else{const ids=[myPeer,...others.map(p=>p.peer)].sort();corner=ids.indexOf(myPeer)%2?1:-1;}}
+  myCorner=corner;
+  const h=ARENA.half*0.8,bx=ARENA.cx+corner*h,bz=ARENA.cz+corner*h;
+  const ox=slot?2.2:(myTeam?-2.2:0),oz=slot?-2.2:(myTeam?2.2:0);
+  mpYaw=Math.atan2(-(ARENA.cx-bx),-(ARENA.cz-bz));
+  for(let k=0;k<120;k++){const r=k<10?0:Math.min(ARENA.half*0.45,0.6+k*0.12),a=Math.random()*6.283;
+    const x=bx+ox+Math.cos(a)*r,z=bz+oz+Math.sin(a)*r;
+    if(outArena(x,z)||H(x,z)<WATER+0.15||!clearOf(x,z,0.9))continue;return {x,z};}
+  return {x:bx,z:bz};}
 function updateRemotes(dt){
   let alive=1,oppAlive=0;
   for(const R of remotes.values()){const t=R.t,r=R.r,k=Math.min(1,dt*10);
@@ -1721,7 +1745,7 @@ function sendPresence(now,isFast){
   if(!MPCH||now-lastPres<33)return;lastPres=now;
   MPCH.presence({mp:1,x:+px.toFixed(2),y:+(H(px,pz)+jumpY).toFixed(2),z:+pz.toFixed(2),yaw:+yaw.toFixed(3),pitch:+pitch.toFixed(3),
     cr:+crouchT.toFixed(2),air:jumpY>0.05?1:0,mv:playerMoving?1:0,f:isFast?1:0,hp:Math.max(0,Math.round(playerHP*10)/10),
-    dead:playerDead?1:0,kb:playerDead?lastHitBy:null,team:myTeam,shot:shotSeq,w:CLS.weapon||'pistol'}).catch(()=>{});
+    dead:playerDead?1:0,kb:playerDead?lastHitBy:null,team:myTeam,cor:myCorner,shot:shotSeq,w:CLS.weapon||'pistol'}).catch(()=>{});
 }
 async function startMP(ch){
   MP=true;everOpp=false;matchEnding=false;playersEl.hidden=false;setupArena();
@@ -2344,7 +2368,7 @@ document.getElementById('cGo').addEventListener('click',()=>{if(warping)return;w
   warpT.textContent=document.getElementById('modeName').textContent+(isMPMode()?' '+typeTxt(MP_TYPE):'');document.getElementById('warpC').textContent=CLS.name;warpEl.classList.add('on');if(sfx&&soundOn)sfx.warp();
   setTimeout(()=>{inMenu=false;menuEl.hidden=true;classesEl.hidden=true;document.getElementById('modesSheet').hidden=true;document.documentElement.classList.add('playing');
     firing=false;if(GRP){if(isMPMode()){startMP(GRP.room);const sp=mpSpawn();px=sp.x;pz=sp.z;}else{startCoop(GRP.room);px=spawnX+Math.random()*4-2;pz=spawnZ+Math.random()*4-2;}}
-    else if(isMPMode()){if(PUB){myTeam=PUB.team;}startMP(PUB?PUB.room:null);const sp=mpSpawn();px=sp.x;pz=sp.z;}else{px=spawnX;pz=spawnZ;}yaw=0.6;pitch=0.05;
+    else if(isMPMode()){if(PUB){myTeam=PUB.team;}startMP(PUB?PUB.room:null);const sp=mpSpawn();px=sp.x;pz=sp.z;}else{px=spawnX;pz=spawnZ;}yaw=(MP&&mpYaw!==null)?mpYaw:0.6;pitch=0.05;
     setTimeout(()=>{warpEl.classList.remove('on');warping=false;},450);},420);});
 const modesSheet=document.getElementById('modesSheet'),modeName=document.getElementById('modeName');
 document.getElementById('modes').addEventListener('click',()=>{modesSheet.hidden=false;});
